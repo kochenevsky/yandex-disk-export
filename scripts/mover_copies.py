@@ -1,5 +1,5 @@
-"""Раскладчик копий: забирает VK<папка>_<n>__<имя> из папки загрузок Chrome
-и переносит в DEST/<относительный путь> по картам VKMAP_*.json."""
+"""Раскладчик копий: забирает TMP<папка>_<n>__<имя> из папки загрузок Chrome
+и переносит в DEST/<относительный путь> по картам TMPMAP_*.json."""
 import argparse, json, os, re, shutil, time
 
 ap = argparse.ArgumentParser()
@@ -12,8 +12,8 @@ BASE = os.path.dirname(DEST.rstrip("/"))
 MAPS = os.path.join(BASE, "_ya_copies_maps")
 LOG = os.path.join(BASE, "ya_copies_mover.log")
 
-file_re = re.compile(r"^(VK\d+_\d+)__")
-map_re = re.compile(r"^VKMAP_\d+.*\.json$")
+file_re = re.compile(r"^(TMP\d+_\d+)__")
+map_re = re.compile(r"^TMPMAP_\d+.*\.json$")
 mapping = {}
 placed = 0
 

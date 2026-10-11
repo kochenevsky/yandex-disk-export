@@ -1,6 +1,6 @@
 // Вставляется в вкладку https://disk.yandex.ru/client/... через javascript_tool.
 // window.__yaExport.start('/disk/Фотокамера/Мой архив') — обход всех подпапок,
-// скачивание XXXL-превью картинок + карты VKMAP_<n>.json для раскладчика.
+// скачивание XXXL-превью картинок + карты TMPMAP_<n>.json для раскладчика.
 (() => {
   const S = { root: '', folders: 0, done: 0, ok: 0, err: 0, skipped: 0, errs: [], failed: [], stop: false, finished: false, cur: '', fno: 1 };
   const base = { sk: 'x', connection_id: String(Date.now()) };
@@ -80,12 +80,12 @@
     const map = {}, jobs = [];
     items.filter(x => x.type === 'file').forEach((x, k) => {
       if (!isImg(x.name) && !isExtra(x.name)) { S.skipped++; return; }
-      const id = 'VK' + fno + '_' + k;
+      const id = 'TMP' + fno + '_' + k;
       map[id] = x.id.slice(S.root.length + 1) + suffix(x.name);
       jobs.push([id, x]);
     });
     if (jobs.length) {
-      save(new Blob([JSON.stringify(map)], { type: 'application/json' }), 'VKMAP_' + fno + '.json');
+      save(new Blob([JSON.stringify(map)], { type: 'application/json' }), 'TMPMAP_' + fno + '.json');
       await new Promise(r => setTimeout(r, 800));
     }
     await fetchJobs(jobs);
@@ -161,12 +161,12 @@
           const want = new Set(paths);
           const fno = S.fno++, map = {}, jobs = [];
           l.filter(x => want.has(x.id)).forEach((x, k) => {
-            const id = 'VK' + fno + '_' + k;
+            const id = 'TMP' + fno + '_' + k;
             map[id] = x.id.slice(S.root.length + 1) + suffix(x.name);
             jobs.push([id, x]);
           });
           if (!jobs.length) continue;
-          save(new Blob([JSON.stringify(map)], { type: 'application/json' }), 'VKMAP_' + fno + '.json');
+          save(new Blob([JSON.stringify(map)], { type: 'application/json' }), 'TMPMAP_' + fno + '.json');
           await new Promise(r => setTimeout(r, 800));
           S.err -= jobs.length; S.done -= jobs.length;
           await fetchJobs(jobs);
