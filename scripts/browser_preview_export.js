@@ -20,6 +20,17 @@
     return j;
   }
 
+  // Во время сбоя Яндекс может не ответить и не закрыть запрос — без таймаута выгрузка
+  // встаёт навсегда. Поэтому каждый запрос ограничен по времени.
+  const FILE_TIMEOUT_MS = 20000;
+  const LIST_TIMEOUT_MS = 30000;
+  function fetchWithTimeout(url, ms) {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), ms);
+    return fetch(url, { credentials: 'include', signal: c.signal }).finally(() => clearTimeout(t));
+  }
+  const withTimeout = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r({ err: 'timeout' }), ms))]);
+
   async function ls(path) {
     let all = [], off = 0;
     for (;;) {
@@ -56,12 +67,12 @@
           const s = (x.meta.sizes || []).find(s => s.name === 'XXXL');
           if (!s) throw new Error('noprev');
           let u = s.url; if (u.startsWith('//')) u = 'https:' + u;
-          const r = await fetch(u, { credentials: 'include' });
+          const r = await fetchWithTimeout(u, FILE_TIMEOUT_MS);
           if (!r.ok) throw new Error('http ' + r.status);
           save(await r.blob(), id + '__' + x.name + suffix(x.name));
           S.ok++;
         } catch (e) {
-          S.err++; S.errs.push([x.id, String(e.message)]); S.failed.push([id, x.id]);
+          S.err++; S.errs.push([x.id, e.name === 'AbortError' ? 'timeout' : String(e.message)]); S.failed.push([id, x.id]);
         }
         S.done++;
         await new Promise(r => setTimeout(r, 150));
@@ -72,7 +83,7 @@
 
   async function doFolder(path, fno) {
     S.cur = path;
-    const l = await ls(path);
+    const l = await withTimeout(ls(path), LIST_TIMEOUT_MS);
     if (l.err) { S.errs.push(['ls', path]); return []; }
     const self = norm(path);
     const items = l.filter(x => norm(x.id) !== self);
@@ -104,7 +115,7 @@
         while (q.length) {
           const d = q.shift();
           inv.folders.push(d.slice(root.length + 1) || '.');
-          const l = await ls(d);
+          const l = await withTimeout(ls(d), LIST_TIMEOUT_MS);
           if (l.err) { inv.errs.push(d); continue; }
           for (const x of l) {
             if (norm(x.id) === norm(d)) continue;
@@ -156,7 +167,7 @@
         for (const [, path] of failed) (byDir[path.slice(0, path.lastIndexOf('/'))] ||= []).push(path);
         for (const [dir, paths] of Object.entries(byDir)) {
           if (S.stop) break;
-          const l = await ls(dir);
+          const l = await withTimeout(ls(dir), LIST_TIMEOUT_MS);
           if (l.err) continue;
           const want = new Set(paths);
           const fno = S.fno++, map = {}, jobs = [];
