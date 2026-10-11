@@ -2,7 +2,7 @@
 // window.__yaExport.start('/disk/Фотокамера/Мой архив') — обход всех подпапок,
 // скачивание XXXL-превью картинок + карты TMPMAP_<n>.json для раскладчика.
 (() => {
-  const S = { root: '', folders: 0, done: 0, ok: 0, err: 0, skipped: 0, errs: [], failed: [], stop: false, finished: false, cur: '', fno: 1 };
+  const S = { prefix: 'TMP', root: '', folders: 0, done: 0, ok: 0, err: 0, skipped: 0, errs: [], failed: [], stop: false, finished: false, cur: '', fno: 1 };
   const base = { sk: 'x', connection_id: String(Date.now()) };
 
   async function api(m, p) {
@@ -92,12 +92,12 @@
     const map = {}, jobs = [];
     items.filter(x => x.type === 'file').forEach((x, k) => {
       if (!isImg(x.name) && !isExtra(x.name)) { S.skipped++; return; }
-      const id = 'TMP' + fno + '_' + k;
+      const id = S.prefix + fno + '_' + k;
       map[id] = x.id.slice(S.root.length + 1) + suffix(x.name);
       jobs.push([id, x]);
     });
     if (jobs.length) {
-      save(new Blob([JSON.stringify(map)], { type: 'application/json' }), 'TMPMAP_' + fno + '.json');
+      save(new Blob([JSON.stringify(map)], { type: 'application/json' }), S.prefix + 'MAP_' + fno + '.json');
       await new Promise(r => setTimeout(r, 800));
     }
     await fetchJobs(jobs);
@@ -151,6 +151,9 @@
     start(root, opts = {}) {
       S.root = norm(root);
       S.skip = new Set(opts.skip || []);
+      // opts.prefix — своя метка временных файлов, чтобы параллельно или следом выгружать
+      // другую папку со своим раскладчиком (mover_copies.py --prefix ...).
+      if (opts.prefix) S.prefix = opts.prefix;
       (async () => {
         const q = [S.root];
         while (q.length && !S.stop) {
@@ -176,12 +179,12 @@
           const want = new Set(paths);
           const fno = S.fno++, map = {}, jobs = [];
           l.filter(x => want.has(x.id)).forEach((x, k) => {
-            const id = 'TMP' + fno + '_' + k;
+            const id = S.prefix + fno + '_' + k;
             map[id] = x.id.slice(S.root.length + 1) + suffix(x.name);
             jobs.push([id, x]);
           });
           if (!jobs.length) continue;
-          save(new Blob([JSON.stringify(map)], { type: 'application/json' }), 'TMPMAP_' + fno + '.json');
+          save(new Blob([JSON.stringify(map)], { type: 'application/json' }), S.prefix + 'MAP_' + fno + '.json');
           await new Promise(r => setTimeout(r, 800));
           S.err -= jobs.length; S.done -= jobs.length;
           await fetchJobs(jobs);

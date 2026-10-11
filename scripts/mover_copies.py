@@ -5,6 +5,7 @@ import argparse, json, os, re, shutil, time
 ap = argparse.ArgumentParser()
 ap.add_argument("--inbox", required=True, help="папка, куда Chrome сохраняет загрузки")
 ap.add_argument("--dest", required=True, help="куда раскладывать")
+ap.add_argument("--prefix", default="TMP", help="метка временных файлов (как в start(..., {prefix}))")
 args = ap.parse_args()
 
 INBOX, DEST = args.inbox, args.dest
@@ -12,8 +13,9 @@ BASE = os.path.dirname(DEST.rstrip("/"))
 MAPS = os.path.join(BASE, "_ya_copies_maps")
 LOG = os.path.join(BASE, "ya_copies_mover.log")
 
-file_re = re.compile(r"^(TMP\d+_\d+)__")
-map_re = re.compile(r"^TMPMAP_\d+.*\.json$")
+P = re.escape(args.prefix)
+file_re = re.compile(rf"^({P}\d+_\d+)__")
+map_re = re.compile(rf"^{P}MAP_\d+.*\.json$")
 mapping = {}
 placed = 0
 
@@ -52,7 +54,7 @@ def step():
         n += 1
     placed += n
     if n:
-        log(f"placed +{n}, total {placed}")
+        log(f"[{args.prefix}] placed +{n}, total {placed}")
 
 
 if __name__ == "__main__":
