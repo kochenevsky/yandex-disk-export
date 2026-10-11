@@ -1,4 +1,6 @@
-# yandex-disk-export — скилл для Claude Code
+# Как скачивать картинки с Яндекс Диска через ИИ-агента
+
+Скилл для Claude Code `yandex-disk-export`.
 
 ![Скачивание фото с Яндекс Диска](assets/cover.png)
 
