@@ -88,6 +88,7 @@
     const self = norm(path);
     const items = l.filter(x => norm(x.id) !== self);
     const dirs = items.filter(x => x.type === 'dir').map(x => x.id);
+    if (S.skip && S.skip.has(self.slice(S.root.length + 1))) return dirs;
     const map = {}, jobs = [];
     items.filter(x => x.type === 'file').forEach((x, k) => {
       if (!isImg(x.name) && !isExtra(x.name)) { S.skipped++; return; }
@@ -145,8 +146,11 @@
       save(new Blob([JSON.stringify({ folders: inv.folders, files: inv.files })], { type: 'application/json' }), name);
       return name;
     },
-    start(root) {
+    // opts.skip — список папок (пути относительно root, '' = сам root), из которых
+    // НЕ качать (уже скачаны), но в их подпапки всё равно заходить. Для продолжения после остановки.
+    start(root, opts = {}) {
       S.root = norm(root);
+      S.skip = new Set(opts.skip || []);
       (async () => {
         const q = [S.root];
         while (q.length && !S.stop) {
