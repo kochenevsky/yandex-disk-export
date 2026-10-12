@@ -11,21 +11,23 @@ count() { find "$1" -type f ! -name .DS_Store 2>/dev/null | wc -l | tr -d ' '; }
 
 prev=$(count "$DEST"); last_line=""; quiet=0; tick=0
 while true; do
-  sleep 60
+  sleep $((60 - 10#$(date +%S)))   # просыпаемся в начале каждой минуты
   tick=$((tick + 1))
   line=$(tail -1 "$LOG" 2>/dev/null)
   if [ "$line" = "$last_line" ]; then quiet=$((quiet + 1)); else quiet=0; fi
   last_line="$line"
   [ "$quiet" -eq "$STALL" ] && echo "ВНИМАНИЕ $(date +%H:%M): нет новых файлов ${STALL}+ мин (последнее: $line)"
-  pgrep -f "python3 .*mover_copies.py" >/dev/null || { [ $((tick % EVERY)) -eq 0 ] && echo "ВНИМАНИЕ $(date +%H:%M): раскладчик не запущен"; }
-  if [ $((tick % EVERY)) -eq 0 ]; then
+  pgrep -f "python3 .*mover_copies.py" >/dev/null || { [ $((10#$(date +%M) % EVERY)) -eq 0 ] && echo "ВНИМАНИЕ $(date +%H:%M): раскладчик не запущен"; }
+  # Сводки привязаны к часам (:00, :15, :30, :45 при EVERY=15), чтобы перезапуск
+  # Monitor (он живёт максимум 30 мин) не сдвигал и не пропускал сводку.
+  if [ $((10#$(date +%M) % EVERY)) -eq 0 ]; then
     now=$(count "$DEST")
     per=""
     for d in "$DEST"/*/; do
       [ -d "$d" ] && per="$per$(basename "$d"): $(count "$d"); "
     done
     staged=$(ls "$INBOX" 2>/dev/null | grep -c -E '^[A-Z]+[0-9]+_[0-9]+__')
-    echo "СВОДКА $(date +%H:%M): всего $now картинок (+$((now - prev)) за ${EVERY} мин); по папкам: ${${per%; }:-—}; ждут раскладки: $staged"
+    echo "СВОДКА $(date +%H:%M): всего $now картинок (+$((now - prev)) с прошлой сводки); по папкам: ${${per%; }:-—}; ждут раскладки: $staged"
     prev=$now
   fi
 done
