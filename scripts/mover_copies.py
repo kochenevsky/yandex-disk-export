@@ -6,10 +6,11 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--inbox", required=True, help="папка, куда Chrome сохраняет загрузки")
 ap.add_argument("--dest", required=True, help="куда раскладывать")
 ap.add_argument("--prefix", default="TMP", help="метка временных файлов (как в start(..., {prefix}))")
+ap.add_argument("--state-dir", default=None, help="куда класть журнал и служебные карты (по умолчанию — рядом с папкой назначения); задай, если DEST — подпапка архива, чтобы служебное не смешивалось с фото")
 args = ap.parse_args()
 
 INBOX, DEST = args.inbox, args.dest
-BASE = os.path.dirname(DEST.rstrip("/"))
+BASE = args.state_dir or os.path.dirname(DEST.rstrip("/"))
 MAPS = os.path.join(BASE, "_ya_copies_maps")
 LOG = os.path.join(BASE, "ya_copies_mover.log")
 
