@@ -31,11 +31,21 @@
   }
   const withTimeout = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r({ err: 'timeout' }), ms))]);
 
+  // Список папки приходит страницами по 200, каждая 1–4 с. Таймаут — на КАЖДУЮ страницу
+  // (с 3 попытками), а не на весь список: иначе папка с тысячами файлов «пустая».
+  async function apiPage(p) {
+    for (let a = 0; a < 3; a++) {
+      const j = await withTimeout(api('mpfs/resources', p), LIST_TIMEOUT_MS);
+      if (!(j && j.err === 'timeout')) return j;
+    }
+    return { err: 'timeout' };
+  }
+
   async function ls(path) {
     let all = [], off = 0;
     for (;;) {
-      const j = await api('mpfs/resources', { sort: 'name', order: '1', idContext: path, amount: 200, offset: off });
-      const res = j.resources || j.result || j;
+      const j = await apiPage({ sort: 'name', order: '1', idContext: path, amount: 200, offset: off });
+      const res = j.resources || j.result;
       if (!Array.isArray(res)) return { err: j };
       all = all.concat(res);
       if (res.length < 200) break;
@@ -83,8 +93,8 @@
 
   async function doFolder(path, fno) {
     S.cur = path;
-    const l = await withTimeout(ls(path), LIST_TIMEOUT_MS);
-    if (l.err) { S.errs.push(['ls', path]); return []; }
+    const l = await ls(path);
+    if (l.err) { S.errs.push(['ls', path]); S.lsFailed = (S.lsFailed || 0) + 1; return []; }
     const self = norm(path);
     const items = l.filter(x => norm(x.id) !== self);
     const dirs = items.filter(x => x.type === 'dir').map(x => x.id);
@@ -116,7 +126,7 @@
         while (q.length) {
           const d = q.shift();
           inv.folders.push(d.slice(root.length + 1) || '.');
-          const l = await withTimeout(ls(d), LIST_TIMEOUT_MS);
+          const l = await ls(d);
           if (l.err) { inv.errs.push(d); continue; }
           for (const x of l) {
             if (norm(x.id) === norm(d)) continue;
@@ -174,7 +184,7 @@
         for (const [, path] of failed) (byDir[path.slice(0, path.lastIndexOf('/'))] ||= []).push(path);
         for (const [dir, paths] of Object.entries(byDir)) {
           if (S.stop) break;
-          const l = await withTimeout(ls(dir), LIST_TIMEOUT_MS);
+          const l = await ls(dir);
           if (l.err) continue;
           const want = new Set(paths);
           const fno = S.fno++, map = {}, jobs = [];
