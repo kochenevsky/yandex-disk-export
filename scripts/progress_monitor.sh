@@ -17,10 +17,13 @@ while true; do
   if [ "$line" = "$last_line" ]; then quiet=$((quiet + 1)); else quiet=0; fi
   last_line="$line"
   [ "$quiet" -eq "$STALL" ] && echo "ВНИМАНИЕ $(date +%H:%M): нет новых файлов ${STALL}+ мин (последнее: $line)"
-  pgrep -f "python3 .*mover_copies.py" >/dev/null || { [ $((10#$(date +%M) % EVERY)) -eq 0 ] && echo "ВНИМАНИЕ $(date +%H:%M): раскладчик не запущен"; }
+  pgrep -f "python3 .*mover_copies.py" >/dev/null || { [ "$quiet" -eq "$STALL" ] && echo "ВНИМАНИЕ $(date +%H:%M): раскладчик не запущен"; }
   # Сводки привязаны к часам (:00, :15, :30, :45 при EVERY=15), чтобы перезапуск
   # Monitor (он живёт максимум 30 мин) не сдвигал и не пропускал сводку.
-  if [ $((10#$(date +%M) % EVERY)) -eq 0 ]; then
+  # Номер текущего 15-минутного слота; сводка — при смене слота. Так она не теряется,
+  # даже если подсчёт файлов затянулся и проверка проскочила нужную минуту.
+  slot=$(( (10#$(date +%H) * 60 + 10#$(date +%M)) / EVERY ))
+  if [ -n "$last_slot" ] && [ "$slot" != "$last_slot" ]; then
     now=$(count "$DEST")
     per=""
     for d in "$DEST"/*/; do
@@ -30,4 +33,5 @@ while true; do
     echo "СВОДКА $(date +%H:%M): всего $now картинок (+$((now - prev)) $since); по папкам: ${${per%; }:-—}; ждут раскладки: $staged"
     prev=$now; since="с прошлой сводки"
   fi
+  last_slot=$slot
 done
