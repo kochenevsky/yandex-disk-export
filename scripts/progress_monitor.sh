@@ -25,7 +25,7 @@ while true; do
       [ -d "$d" ] && per="$per$(basename "$d"): $(count "$d"); "
     done
     staged=$(ls "$INBOX" 2>/dev/null | grep -c -E '^[A-Z]+[0-9]+_[0-9]+__')
-    echo "СВОДКА $(date +%H:%M): всего $now картинок (+$((now - prev)) за ${EVERY} мин); по папкам: ${per:-—}; ждут раскладки: $staged"
+    echo "СВОДКА $(date +%H:%M): всего $now картинок (+$((now - prev)) за ${EVERY} мин); по папкам: ${${per%; }:-—}; ждут раскладки: $staged"
     prev=$now
   fi
 done
