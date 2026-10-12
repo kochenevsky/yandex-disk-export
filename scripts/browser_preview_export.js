@@ -116,8 +116,9 @@
         } catch (e) {
           S.err++; S.errs.push([x.id, e.name === 'AbortError' ? 'timeout' : String(e.message)]); S.failed.push([id, x.id]);
         }
+        // Без пауз между файлами: в фоновой вкладке Chrome растягивает таймеры до ~1 мин,
+        // и цепочка пауз превращается в остановку. Темп задают сами 4 потока.
         S.done++; S.beat = Date.now();
-        await new Promise(r => setTimeout(r, 150));
       }
     };
     await Promise.all([worker(), worker(), worker(), worker()]);
@@ -140,7 +141,6 @@
     });
     if (jobs.length) {
       save(new Blob([JSON.stringify(map)], { type: 'application/json' }), S.prefix + 'MAP_' + fno + '.json');
-      await new Promise(r => setTimeout(r, 800));
     }
     await fetchJobs(jobs);
     return dirs;
@@ -250,8 +250,7 @@
           });
           if (!jobs.length) continue;
           save(new Blob([JSON.stringify(map)], { type: 'application/json' }), S.prefix + 'MAP_' + fno + '.json');
-          await new Promise(r => setTimeout(r, 800));
-          S.err -= jobs.length; S.done -= jobs.length;
+              S.err -= jobs.length; S.done -= jobs.length;
           await fetchJobs(jobs);
         }
         S.finished = true;
