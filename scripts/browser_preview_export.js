@@ -22,12 +22,18 @@
 
   // Во время сбоя Яндекс может не ответить и не закрыть запрос — без таймаута выгрузка
   // встаёт навсегда. Поэтому каждый запрос ограничен по времени.
-  const FILE_TIMEOUT_MS = 20000;
+  const FILE_TIMEOUT_MS = 25000;
   const LIST_TIMEOUT_MS = 30000;
-  function fetchWithTimeout(url, ms) {
+  // Таймаут на ВЕСЬ файл, включая чтение тела: передача может зависнуть посреди файла,
+  // и если таймер снять сразу после заголовков, поток встанет навсегда.
+  async function fetchBlobWithTimeout(url, ms) {
     const c = new AbortController();
     const t = setTimeout(() => c.abort(), ms);
-    return fetch(url, { credentials: 'include', signal: c.signal }).finally(() => clearTimeout(t));
+    try {
+      const r = await fetch(url, { credentials: 'include', signal: c.signal });
+      if (!r.ok) throw new Error('http ' + r.status);
+      return await r.blob();
+    } finally { clearTimeout(t); }
   }
   const withTimeout = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r({ err: 'timeout' }), ms))]);
 
@@ -77,14 +83,12 @@
           const s = (x.meta.sizes || []).find(s => s.name === 'XXXL');
           if (!s) throw new Error('noprev');
           let u = s.url; if (u.startsWith('//')) u = 'https:' + u;
-          const r = await fetchWithTimeout(u, FILE_TIMEOUT_MS);
-          if (!r.ok) throw new Error('http ' + r.status);
-          save(await r.blob(), id + '__' + x.name + suffix(x.name));
+          save(await fetchBlobWithTimeout(u, FILE_TIMEOUT_MS), id + '__' + x.name + suffix(x.name));
           S.ok++;
         } catch (e) {
           S.err++; S.errs.push([x.id, e.name === 'AbortError' ? 'timeout' : String(e.message)]); S.failed.push([id, x.id]);
         }
-        S.done++;
+        S.done++; S.beat = Date.now();
         await new Promise(r => setTimeout(r, 150));
       }
     };
@@ -206,7 +210,7 @@
     stop() { S.stop = true; },
     status() {
       const { errs, failed, ...rest } = S;
-      return { ...rest, failedCount: failed.length, lastErrs: errs.slice(-3) };
+      return { ...rest, failedCount: failed.length, lastErrs: errs.slice(-3), idleSec: S.beat ? Math.round((Date.now() - S.beat) / 1000) : null };
     },
   };
 })();
