@@ -68,6 +68,26 @@
     setTimeout(() => URL.revokeObjectURL(u), 60000);
   }
 
+  // Вкладки-помощники на N.downloader.disk.yandex.ru: для превью без CORS-заголовка
+  // скачивание со страницы Диска падает с «Failed to fetch», а со «своего» адреса — работает.
+  const helpers = {}, helperReady = {}, pending = {};
+  const helperErr = {};
+  window.addEventListener('message', e => {
+    const m = e.data; if (!m) return;
+    if (m.t === 'ready') helperReady[m.host] = true;
+    else if (m.t === 'res' && pending[m.id]) { pending[m.id](m); delete pending[m.id]; }
+  });
+  function viaHelper(url, name) {
+    return new Promise(res => {
+      const host = new URL(url).host, w = helpers[host];
+      if (!w || w.closed) return res({ ok: false, err: 'nohelper ' + host });
+      const id = Math.random().toString(36).slice(2);
+      const t = setTimeout(() => { delete pending[id]; res({ ok: false, err: 'helper timeout' }); }, 32000);
+      pending[id] = m => { clearTimeout(t); res(m); };
+      w.postMessage({ t: 'get', id, url, name }, 'https://' + host);
+    });
+  }
+
   const isImg = n => /\.(jpe?g|png|gif)$/i.test(n);
   // RAW/HEIC и пр.: Яндекс отдаёт превью в JPEG — сохраняем как <имя>.jpg
   const isExtra = n => /\.(cr2|cr3|nef|arw|dng|heic|heif|tiff?|bmp|webp)$/i.test(n);
@@ -83,7 +103,15 @@
           const s = (x.meta.sizes || []).find(s => s.name === 'XXXL');
           if (!s) throw new Error('noprev');
           let u = s.url; if (u.startsWith('//')) u = 'https:' + u;
-          save(await fetchBlobWithTimeout(u, FILE_TIMEOUT_MS), id + '__' + x.name + suffix(x.name));
+          const nm = id + '__' + x.name + suffix(x.name);
+          try {
+            save(await fetchBlobWithTimeout(u, FILE_TIMEOUT_MS), nm);
+            S.okDirect = (S.okDirect || 0) + 1;
+          } catch (e1) {
+            const r = await viaHelper(u, nm);
+            if (!r.ok) { helperErr[r.err] = (helperErr[r.err] || 0) + 1; throw new Error(r.err || String(e1.message)); }
+            S.okHelper = (S.okHelper || 0) + 1;
+          }
           S.ok++;
         } catch (e) {
           S.err++; S.errs.push([x.id, e.name === 'AbortError' ? 'timeout' : String(e.message)]); S.failed.push([id, x.id]);
@@ -122,6 +150,29 @@
   const inv = { folders: [], files: [], finished: false, errs: [] };
 
   window.__yaExport = {
+    // Кнопки на странице: по одной на каждый адрес N.downloader.disk.yandex.ru.
+    // Нажать каждую (window.open разрешён только по клику), потом в каждую
+    // открывшуюся вкладку вставить scripts/helper_tab.js.
+    helperButtons(hosts = ['1', '2', '3', '4']) {
+      document.getElementById('__yaHelperBox')?.remove();
+      const box = document.createElement('div');
+      box.id = '__yaHelperBox';
+      box.style.cssText = 'position:fixed;top:250px;left:500px;z-index:999999;display:flex;gap:12px';
+      hosts.forEach(n => {
+        const h = n + '.downloader.disk.yandex.ru';
+        const b = document.createElement('button');
+        b.textContent = 'HELPER ' + n;
+        b.style.cssText = 'padding:18px;font-size:18px;background:#f15a3d;color:#fff';
+        b.onclick = () => { helpers[h] = window.open('https://' + h + '/?keep=open', 'yahelper_' + n); };
+        box.appendChild(b);
+      });
+      document.body.appendChild(box);
+      return 'нажми ' + hosts.length + ' кнопки';
+    },
+    helpersStatus() {
+      document.getElementById('__yaHelperBox')?.remove();
+      return { ready: Object.keys(helperReady), open: Object.entries(helpers).filter(([, w]) => w && !w.closed).map(([h]) => h), helperErr };
+    },
     scan(root) {
       root = norm(root);
       inv.folders = []; inv.files = []; inv.errs = []; inv.finished = false;

@@ -9,7 +9,7 @@ DEST="$1"; INBOX="$2"; EVERY="${3:-15}"; STALL="${4:-20}"
 LOG="$(dirname "${DEST%/}")/ya_copies_mover.log"
 count() { find "$1" -type f ! -name .DS_Store 2>/dev/null | wc -l | tr -d ' '; }
 
-prev=$(count "$DEST"); last_line=""; quiet=0; tick=0
+prev=$(count "$DEST"); since="с запуска наблюдения"; last_line=""; quiet=0; tick=0
 while true; do
   sleep $((60 - 10#$(date +%S)))   # просыпаемся в начале каждой минуты
   tick=$((tick + 1))
@@ -27,7 +27,7 @@ while true; do
       [ -d "$d" ] && per="$per$(basename "$d"): $(count "$d"); "
     done
     staged=$(ls "$INBOX" 2>/dev/null | grep -c -E '^[A-Z]+[0-9]+_[0-9]+__')
-    echo "СВОДКА $(date +%H:%M): всего $now картинок (+$((now - prev)) с прошлой сводки); по папкам: ${${per%; }:-—}; ждут раскладки: $staged"
-    prev=$now
+    echo "СВОДКА $(date +%H:%M): всего $now картинок (+$((now - prev)) $since); по папкам: ${${per%; }:-—}; ждут раскладки: $staged"
+    prev=$now; since="с прошлой сводки"
   fi
 done
