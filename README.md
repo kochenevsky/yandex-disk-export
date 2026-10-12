@@ -123,6 +123,7 @@ git clone https://github.com/kochenevsky/yandex-disk-export ~/.claude/skills/yan
 - `scripts/helper_tab.js` — вкладка-помощник: скачивает фото, которые браузер не даёт прочитать со страницы Диска (защита CORS)
 - `scripts/mover_copies.py` — раскладчик: переносит скачанное в нужные подпапки
 - `scripts/progress_monitor.sh` — сводка прогресса раз в 15 минут
+- `scripts/done_files.py` — список уже скачанных файлов для продолжения внутри большой папки
 - `scripts/done_folders.py` — список уже скачанных папок для продолжения после остановки
 
 ---

@@ -2,7 +2,10 @@
 // window.__yaExport.start('/disk/Фотокамера/Мой архив') — обход всех подпапок,
 // скачивание XXXL-превью картинок + карты TMPMAP_<n>.json для раскладчика.
 (() => {
-  const S = { prefix: 'TMP', root: '', folders: 0, done: 0, ok: 0, err: 0, skipped: 0, errs: [], failed: [], stop: false, finished: false, cur: '', fno: 1 };
+  const S = { prefix: 'TMP', root: '', folders: 0, done: 0, ok: 0, err: 0, skipped: 0, errs: [], failed: [], stop: false, finished: false, cur: '',
+    // Номера пачек уникальны для каждого запуска: раскладчик помнит карты прошлых запусков
+    // с той же меткой, и совпадение номеров могло бы отправить файл не в ту папку.
+    fno: (Date.now() % 10000000) * 10 };
   const base = { sk: 'x', connection_id: String(Date.now()) };
 
   async function api(m, p) {
@@ -70,13 +73,17 @@
 
   // Вкладки-помощники на N.downloader.disk.yandex.ru: для превью без CORS-заголовка
   // скачивание со страницы Диска падает с «Failed to fetch», а со «своего» адреса — работает.
-  const helpers = {}, helperReady = {}, pending = {};
+  // Хранятся на window, чтобы повторная вставка скрипта не теряла уже открытых помощников.
+  const helpers = (window.__yaHelpers ||= {}), helperReady = (window.__yaHelperReady ||= {}), pending = (window.__yaPending ||= {});
   const helperErr = {};
-  window.addEventListener('message', e => {
-    const m = e.data; if (!m) return;
-    if (m.t === 'ready') helperReady[m.host] = true;
-    else if (m.t === 'res' && pending[m.id]) { pending[m.id](m); delete pending[m.id]; }
-  });
+  if (!window.__yaMsgHooked) {
+    window.__yaMsgHooked = true;
+    window.addEventListener('message', e => {
+      const m = e.data; if (!m) return;
+      if (m.t === 'ready') window.__yaHelperReady[m.host] = true;
+      else if (m.t === 'res' && window.__yaPending[m.id]) { window.__yaPending[m.id](m); delete window.__yaPending[m.id]; }
+    });
+  }
   function viaHelper(url, name) {
     return new Promise(res => {
       const host = new URL(url).host, w = helpers[host];
@@ -135,6 +142,7 @@
     const map = {}, jobs = [];
     items.filter(x => x.type === 'file').forEach((x, k) => {
       if (!isImg(x.name) && !isExtra(x.name)) { S.skipped++; return; }
+      if (S.skipFiles && S.skipFiles.has(x.id.slice(S.root.length + 1))) { S.already = (S.already || 0) + 1; return; }
       const id = S.prefix + fno + '_' + k;
       map[id] = x.id.slice(S.root.length + 1) + suffix(x.name);
       jobs.push([id, x]);
@@ -168,6 +176,17 @@
       });
       document.body.appendChild(box);
       return 'нажми ' + hosts.length + ' кнопки';
+    },
+    // Поле выбора файла для загрузки списка уже скачанного (JSON-массив путей).
+    // Claude загружает файл инструментом file_upload (по ref поля с подписью «yadisk have list»).
+    haveInput() {
+      document.getElementById('__yaHaveInput')?.remove();
+      const i = document.createElement('input');
+      i.type = 'file'; i.id = '__yaHaveInput'; i.setAttribute('aria-label', 'yadisk have list');
+      i.style.cssText = 'position:fixed;top:10px;left:10px;z-index:999999';
+      i.onchange = async () => { window.__yaHave = JSON.parse(await i.files[0].text()); i.remove(); };
+      document.body.appendChild(i);
+      return 'загрузи файл в поле «yadisk have list»';
     },
     helpersStatus() {
       document.getElementById('__yaHelperBox')?.remove();
@@ -214,11 +233,15 @@
     // opts.skip — список папок (пути относительно root, '' = сам root), из которых
     // НЕ качать (уже скачаны), но в их подпапки всё равно заходить. Для продолжения после остановки.
     start(root, opts = {}) {
+      S.finished = false; S.stop = false;
       S.root = norm(root);
       S.skip = new Set(opts.skip || []);
       // opts.prefix — своя метка временных файлов, чтобы параллельно или следом выгружать
       // другую папку со своим раскладчиком (mover_copies.py --prefix ...).
       if (opts.prefix) S.prefix = opts.prefix;
+      // opts.skipFiles — пути файлов (относительно root, исходные имена), которые уже есть на диске:
+      // их не качать. Список готовит scripts/done_files.py, во вкладку — через haveInput().
+      S.skipFiles = opts.skipFiles ? new Set(opts.skipFiles) : (window.__yaHave ? new Set(window.__yaHave) : null);
       (async () => {
         const q = [S.root];
         while (q.length && !S.stop) {
