@@ -88,6 +88,7 @@ flowchart TD
 - 💾 сохраняет в любую папку: на Mac, внешний или сетевой диск
 - 🔁 запоминает, что не скачалось, и умеет повторить
 - ⏯️ продолжает с места остановки, если что-то прервалось
+- 📊 сам присылает сводку прогресса раз в 15 минут
 
 ## 🧰 Что нужно
 - [Claude Code](https://claude.com/claude-code)
@@ -108,6 +109,7 @@ git clone https://github.com/kochenevsky/yandex-disk-export ~/.claude/skills/yan
 - `SKILL.md` — инструкция для Claude (шаги, грабли, ручной режим)
 - `scripts/browser_preview_export.js` — скрипт для вкладки Яндекс Диска: опись папок и выгрузка
 - `scripts/mover_copies.py` — раскладчик: переносит скачанное в нужные подпапки
+- `scripts/progress_monitor.sh` — сводка прогресса раз в 15 минут
 - `scripts/done_folders.py` — список уже скачанных папок для продолжения после остановки
 
 ---
